@@ -76,8 +76,8 @@ def Create_Service(client_secret_file, api_name, api_version, *scopes):
         print('Unable to connect.')
         print(e)
         return None
-@app.route("/search-google-drive/{query}")
-def Result(query):
+@app.route("/<query>")
+def Result(query: str):
     Client_secrete_file='client_secret_1036886342741-cs4f6svu1uoas4gt8tnfveeeajsfab18.apps.googleusercontent.com.json'
     Client_secrete_file='client_secret_1036886342741-cs4f6svu1uoas4gt8tnfveeeajsfab18.apps.googleusercontent.com.json'
     Api_name="drive"
