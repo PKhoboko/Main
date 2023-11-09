@@ -17,9 +17,13 @@ from google_auth_oauthlib.flow import Flow, InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from google.auth.transport.requests import Request
+from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 
 
-app = Flask(__name__)
+app = FastAPI(title="Search Google App using python")
+
+
 
 def download_file_content(service, file_id, name):
     request = service.files().get_media(fileId=file_id)
@@ -73,7 +77,7 @@ def Create_Service(client_secret_file, api_name, api_version, *scopes):
         print('Unable to connect.')
         print(e)
         return None
-@app.route("/<query>")
+@app.get("/search-google-drive/{query}")
 def Result(query):
     Client_secrete_file='client_secret_1036886342741-cs4f6svu1uoas4gt8tnfveeeajsfab18.apps.googleusercontent.com.json'
     Client_secrete_file='client_secret_1036886342741-cs4f6svu1uoas4gt8tnfveeeajsfab18.apps.googleusercontent.com.json'
