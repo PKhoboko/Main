@@ -20,7 +20,12 @@ SCOPES = ['https://www.googleapis.com/auth/drive']
 
 def authorize_user():
     flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
-    credentials = flow.run_local_server(port=0, prompt='consent')
+    authorization_url, _ = flow.authorization_url(prompt='consent')
+
+    print(f'Please go to this URL to authorize: {authorization_url}')
+    authorization_code = input('Enter the authorization code: ')
+
+    credentials = flow.fetch_token(code=authorization_code)
 
     return credentials
 
