@@ -10,7 +10,7 @@ import flask
 from flask import session, redirect, url_for, jsonify
 
 app = flask.Flask(__name__)
-app.secret_key = 'your_secret_key'
+app.secret_key = 'your_generated_secret_key'
 
 # Google Drive API settings
 CLIENT_SECRET_FILE = 'client_secret_1036886342741-cs4f6svu1uoas4gt8tnfveeeajsfab18.apps.googleusercontent.com.json'
@@ -20,7 +20,7 @@ SCOPES = ['https://www.googleapis.com/auth/drive']
 
 def authorize_user():
     flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
-    credentials = flow.run_local_server(port=0)
+    credentials = flow.run_console()
 
     return credentials
 
