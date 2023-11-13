@@ -1,99 +1,111 @@
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
-from io import BytesIO
-import io
-from docx import Document
-from flask import Flask, request, jsonify
-import pickle
-import os
-import re
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
-from io import BytesIO
-import os
-from google_auth_oauthlib.flow import Flow, InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+from io import BytesIO
+from docx import Document
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 import flask
+from flask import session, redirect, url_for, jsonify
 
+app = flask.Flask(__name__)
+app.secret_key = 'your_secret_key'
 
-app = app = flask.Flask(__name__)
+# Google Drive API settings
+CLIENT_SECRET_FILE = 'client_secret_1036886342741-cs4f6svu1uoas4gt8tnfveeeajsfab18.apps.googleusercontent.com.json'
+API_NAME = 'drive'
+API_VERSION = 'v3'
+SCOPES = ['https://www.googleapis.com/auth/drive']
 
+# Selenium settings
+CHROME_DRIVER_PATH = '/usr/bin/chromedriver'  # Path in the Docker image
 
+def authorize_user():
+    flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
+    credentials = flow.run_local_server(port=0)
+
+    return credentials
+
+def create_drive_service(credentials):
+    service = build(API_NAME, API_VERSION, credentials=credentials)
+    return service
 
 def download_file_content(service, file_id, name):
-    request = service.files().get_media(fileId=file_id)
+    request = service.files().export_media(fileId=file_id, mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     
-    file_content = io.BytesIO()
+    file_content = BytesIO()
     downloader = MediaIoBaseDownload(file_content, request)
     done = False
     while not done:
-            status, done = downloader.next_chunk()
-    doc = Document(io.BytesIO(file_content.getvalue()))
+        status, done = downloader.next_chunk()
+    
+    doc = Document(BytesIO(file_content.getvalue()))
 
-        # Extract and concatenate text from paragraphs in the document
     text_content = ''
     for paragraph in doc.paragraphs:
-            text_content += paragraph.text + '\n'
+        text_content += paragraph.text + '\n'
 
     return text_content
 
-def Create_Service(client_secret_file, api_name, api_version, *scopes):
-    print(client_secret_file, api_name, api_version, scopes, sep='-')
-    CLIENT_SECRET_FILE = client_secret_file
-    API_SERVICE_NAME = api_name
-    API_VERSION = api_version
-    SCOPES = [scope for scope in scopes[0]]
-    print(SCOPES)
+def setup_headless_browser():
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    return webdriver.Chrome(executable_path=CHROME_DRIVER_PATH, options=chrome_options)
 
-    cred = None
+@app.route('/')
+def index():
+    if 'credentials' not in session:
+        return redirect(url_for('login'))
 
-    pickle_file = f'token_{API_SERVICE_NAME}_{API_VERSION}.pickle'
-    # print(pickle_file)
+    credentials = session['credentials']
+    service = create_drive_service(credentials)
 
-    if os.path.exists(pickle_file):
-        with open(pickle_file, 'rb') as token:
-            cred = pickle.load(token)
+    browser = setup_headless_browser()
+    browser.get('https://drive.google.com')
+    
+    # You can add further Selenium actions here to interact with the Google Drive web interface.
+    # For example, you can find elements, click buttons, and navigate through folders.
 
-    if not cred or not cred.valid:
-        if cred and cred.expired and cred.refresh_token:
-            cred.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
-            cred = flow.run_local_server()
+    # Capture a screenshot (you can customize this part)
+    browser.save_screenshot('/tmp/screenshot.png')
 
-        with open(pickle_file, 'wb') as token:
-            pickle.dump(cred, token)
+    browser.quit()
 
-    try:
-        service = build(API_SERVICE_NAME, API_VERSION, credentials=cred)
-        print(API_SERVICE_NAME, 'service created successfully')
-        return service
-    except Exception as e:
-        print('Unable to connect.')
-        print(e)
-        return None
-@app.route("/<query>")
-def Result(query: str):
-    Client_secrete_file='client_secret_1036886342741-cs4f6svu1uoas4gt8tnfveeeajsfab18.apps.googleusercontent.com.json'
-    Client_secrete_file='client_secret_1036886342741-cs4f6svu1uoas4gt8tnfveeeajsfab18.apps.googleusercontent.com.json'
-    Api_name="drive"
-    api_version='V3'
-    scopes=['https://www.googleapis.com/auth/drive']
-    service = Create_Service(Client_secrete_file, Api_name, api_version, scopes)
-    response = service.files().list(q=f"fullText contains '{query}' and name contains '.docx'").execute()
-    Details = []
-    for file in response['files'][:50]:
-        
+    response = service.files().list(q="mimeType='application/vnd.google-apps.document'").execute()
+    details = []
+
+    for file in response.get('files', []):
         file_contents = download_file_content(service, file['id'], file['name'])
-        Details.append({
-             "Filename": file['name'], 
-           "Content": file_contents[100:1000]
+        details.append({
+            "Filename": file['name'], 
+            "Content": file_contents[100:1000]
         })
-    return jsonify(Details), 200
+
+    return jsonify(details), 200
+
+@app.route('/login')
+def login():
+    credentials = authorize_user()
+    session['credentials'] = credentials_to_dict(credentials)
+    return redirect(url_for('index'))
+
+@app.route('/logout')
+def logout():
+    if 'credentials' in session:
+        del session['credentials']
+    return redirect(url_for('index'))
+
+def credentials_to_dict(credentials):
+    return {'token': credentials.token,
+            'refresh_token': credentials.refresh_token,
+            'token_uri': credentials.token_uri,
+            'client_id': credentials.client_id,
+            'client_secret': credentials.client_secret,
+            'scopes': credentials.scopes}
 
 if __name__ == "__main__":
-     app.run()
+    app.run(host='0.0.0.0', port=5000)  # Make sure to bind to 0.0.0.0
