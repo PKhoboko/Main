@@ -18,9 +18,6 @@ API_NAME = 'drive'
 API_VERSION = 'v3'
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
-# Selenium settings
-CHROME_DRIVER_PATH = '/usr/bin/chromedriver'  # Path in the Docker image
-
 def authorize_user():
     flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
     credentials = flow.run_local_server(port=0)
@@ -54,7 +51,7 @@ def setup_headless_browser():
     chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
-    return webdriver.Chrome(executable_path=CHROME_DRIVER_PATH, options=chrome_options)
+    return webdriver.Chrome(options=chrome_options)
 
 @app.route('/')
 def index():
@@ -108,4 +105,4 @@ def credentials_to_dict(credentials):
             'scopes': credentials.scopes}
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)  # Make sure to bind to 0.0.0.0
+    app.run(host='0.0.0.0', port=5000)
